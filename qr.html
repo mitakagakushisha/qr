@@ -28,23 +28,23 @@
   const result = document.getElementById("result");
   const switchBtn = document.getElementById("switchBtn");
 
-  let currentCamera = "user"; // 最初はインカメ
+  let currentCameraIndex = 0; // 0 = インカメ、1 = 外カメ
+  let devices = [];
   let codeReader = new BrowserQRCodeReader();
-  let currentDeviceId = null;
 
   async function startCamera() {
-    const devices = await BrowserQRCodeReader.listVideoInputDevices();
+    // デバイス一覧取得
+    devices = await BrowserQRCodeReader.listVideoInputDevices();
 
-    // インカメ or 外カメを選択
-    const device = devices.find(d =>
-      currentCamera === "user"
-        ? d.label.toLowerCase().includes("front")
-        : d.label.toLowerCase().includes("back")
-    ) || devices[0];
+    if (devices.length === 0) {
+      result.textContent = "カメラが見つかりません";
+      return;
+    }
 
-    currentDeviceId = device.deviceId;
+    // インカメ＝0番、外カメ＝1番（なければ0番）
+    const device = devices[currentCameraIndex] || devices[0];
 
-    codeReader.decodeFromVideoDevice(currentDeviceId, video, (res, err) => {
+    codeReader.decodeFromVideoDevice(device.deviceId, video, (res, err) => {
       if (res) {
         const jukusei = res.getText();
 
@@ -64,14 +64,14 @@
     });
   }
 
-  // 初期起動
+  // 初期起動（インカメ＝0番）
   startCamera();
 
   // カメラ切り替え
   switchBtn.onclick = () => {
-    currentCamera = currentCamera === "user" ? "environment" : "user";
+    currentCameraIndex = currentCameraIndex === 0 ? 1 : 0;
     switchBtn.textContent =
-      currentCamera === "user" ? "外カメに切り替え" : "インカメに切り替え";
+      currentCameraIndex === 0 ? "外カメに切り替え" : "インカメに切り替え";
 
     codeReader.reset();
     startCamera();
