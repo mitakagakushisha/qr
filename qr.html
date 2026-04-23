@@ -28,19 +28,27 @@
   const switchBtn = document.getElementById("switchBtn");
 
   let currentCamera = "user"; // 最初はインカメ
+  let currentStream = null;
 
-  function startCamera() {
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: currentCamera }
-    })
-    .then(stream => {
+  async function startCamera() {
+    // ★ 既存ストリームを完全停止（これが無いと映像が出ない）
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => track.stop());
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: currentCamera }
+      });
+
+      currentStream = stream;
       video.srcObject = stream;
-      video.play();
-    })
-    .catch(err => {
+      await video.play();
+
+    } catch (err) {
       console.error("カメラ起動エラー:", err);
       result.textContent = "カメラを起動できませんでした";
-    });
+    }
   }
 
   // 初期起動（インカメ）
@@ -58,7 +66,7 @@
 
   function scan() {
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width = video.videoWidth * 0.7;  // ← インカメ対策：縮小して認識率UP
+      canvas.width = video.videoWidth * 0.7;
       canvas.height = video.videoHeight * 0.7;
 
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
