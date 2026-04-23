@@ -90,7 +90,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 100;
+      z-index: 150;
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
     #lock-btn:active { background: #eee; }
@@ -206,8 +206,9 @@
     if (qrCode === lastCode && now - lastTime < COOLDOWN) return;
     if (isSending) return;
 
-    if (lastType === "IN" && now - lastTypeTime < IN_TO_OUT_WAIT) {
-      showMessage(`すでに入室は完了しています。\n退室する場合は時間をおいてから再度QRを読み取ってください。`, "err");
+    if (lastType !== null && now - lastTypeTime < IN_TO_OUT_WAIT) {
+      const action = lastType === "IN" ? "入室" : "退室";
+      showMessage(`すでに${action}は完了しています。\n次の読み取りは時間をおいてから行ってください。`, "err");
       return;
     }
 
@@ -251,13 +252,13 @@
   // ======== ロック ========
   function handleLockBtn() {
     if (!isLocked) {
-      // ロックをかける（シールドで操作ブロック、映像はそのまま）
+      // 1回目：シールドをかけるだけ。パスワード画面は出さない
       isLocked = true;
       document.getElementById("lock-shield").classList.add("show");
       document.getElementById("icon-unlocked").style.display = "none";
       document.getElementById("icon-locked").style.display   = "block";
     } else {
-      // ロック中→解除オーバーレイを表示
+      // 2回目：パスワード入力画面を出す
       document.getElementById("lock-overlay").classList.add("show");
       document.getElementById("pw-input").focus();
     }
