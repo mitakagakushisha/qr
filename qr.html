@@ -29,9 +29,11 @@
 
   let currentCamera = "user"; // 最初はインカメ
   let currentStream = null;
+  let scanning = false;
 
+  // ★ カメラ起動（play完了まで待つ）
   async function startCamera() {
-    // ★ 既存ストリームを完全停止（これが無いと映像が出ない）
+    // 既存ストリーム停止
     if (currentStream) {
       currentStream.getTracks().forEach(track => track.stop());
     }
@@ -43,7 +45,15 @@
 
       currentStream = stream;
       video.srcObject = stream;
+
+      // ★ play() 完了を待つ（これが超重要）
       await video.play();
+
+      // play完了後に scan を開始
+      if (!scanning) {
+        scanning = true;
+        requestAnimationFrame(scan);
+      }
 
     } catch (err) {
       console.error("カメラ起動エラー:", err);
@@ -51,7 +61,7 @@
     }
   }
 
-  // 初期起動（インカメ）
+  // 初期起動
   startCamera();
 
   // カメラ切り替え
@@ -64,8 +74,11 @@
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
 
+  // ★ QR読み取りループ
   function scan() {
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
+
+      // インカメ対策：縮小して認識率UP
       canvas.width = video.videoWidth * 0.7;
       canvas.height = video.videoHeight * 0.7;
 
@@ -90,10 +103,9 @@
         setTimeout(() => result.textContent = "", 2000);
       }
     }
+
     requestAnimationFrame(scan);
   }
-
-  scan();
 </script>
 
 </body>
