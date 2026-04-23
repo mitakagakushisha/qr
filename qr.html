@@ -9,7 +9,7 @@
 
     body {
       font-family: sans-serif;
-      background: #1a1a2e;
+      background: #f0f2f5;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -19,24 +19,29 @@
     }
 
     h2 {
-      color: #fff;
+      color: #333;
       font-size: 20px;
       margin-bottom: 16px;
-      letter-spacing: 0.05em;
     }
 
     /* カメラ */
     #reader {
-      width: min(80vw, 520px);
+      width: min(90vw, 680px);
       border-radius: 12px;
       overflow: hidden;
-      border: 2px solid #444;
+      border: 2px solid #ccc;
+      transition: filter 0.3s;
     }
 
-    /* メッセージ表示エリア */
+    body.locked #reader {
+      pointer-events: none;
+      filter: brightness(0.4);
+    }
+
+    /* メッセージ */
     #message {
-      margin-top: 24px;
-      width: min(80vw, 520px);
+      margin-top: 20px;
+      width: min(90vw, 680px);
       min-height: 80px;
       border-radius: 10px;
       display: flex;
@@ -49,32 +54,37 @@
       line-height: 1.6;
       opacity: 0;
       transition: opacity 0.3s;
+      white-space: pre-line;
     }
 
     #message.show { opacity: 1; }
-    #message.in  { background: #1a7a3f; color: #fff; }
-    #message.out { background: #a93226; color: #fff; }
-    #message.err { background: #555; color: #eee; font-size: 15px; }
+    #message.in  { background: #d4edda; color: #1a7a3f; }
+    #message.out { background: #f8d7da; color: #a93226; }
+    #message.err { background: #e2e3e5; color: #555; font-size: 15px; }
 
-    /* ロックボタン */
+    /* 南京錠ボタン */
     #lock-btn {
       position: fixed;
-      bottom: 20px;
-      right: 20px;
-      width: 48px;
-      height: 48px;
+      bottom: 24px;
+      right: 24px;
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
-      border: none;
-      background: rgba(255,255,255,0.15);
-      color: #fff;
-      font-size: 22px;
+      border: 2px solid #bbb;
+      background: #fff;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 100;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
-    #lock-btn:active { background: rgba(255,255,255,0.3); }
+    #lock-btn:active { background: #eee; }
+
+    #lock-btn svg {
+      width: 28px;
+      height: 28px;
+    }
 
     /* ロックオーバーレイ */
     #lock-overlay {
@@ -98,14 +108,13 @@
     #pw-input {
       width: 180px;
       padding: 10px 14px;
-      font-size: 20px;
+      font-size: 22px;
       border-radius: 8px;
-      border: none;
+      border: 1px solid #555;
       text-align: center;
       letter-spacing: 0.2em;
       background: #222;
       color: #fff;
-      border: 1px solid #555;
     }
 
     #pw-error {
@@ -124,9 +133,6 @@
       cursor: pointer;
     }
     #pw-submit:active { background: #357abd; }
-
-    /* ロック中はスキャンエリアをブロック */
-    body.locked #reader { pointer-events: none; filter: brightness(0.4); }
   </style>
 </head>
 <body>
@@ -135,8 +141,19 @@
 <div id="reader"></div>
 <div id="message"></div>
 
-<!-- ロックボタン（南京錠） -->
-<button id="lock-btn" onclick="toggleLock()" title="ロック切り替え">🔓</button>
+<!-- 南京錠ボタン（SVGピクトグラム） -->
+<button id="lock-btn" onclick="handleLockBtn()" title="ロック切り替え">
+  <!-- 解錠アイコン（デフォルト） -->
+  <svg id="icon-unlocked" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+    <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+  </svg>
+  <!-- 施錠アイコン（ロック中） -->
+  <svg id="icon-locked" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+</button>
 
 <!-- ロック解除オーバーレイ -->
 <div id="lock-overlay">
@@ -153,23 +170,23 @@
 <script>
   const GAS_URL  = "https://script.google.com/macros/s/AKfycbwjyfkI6m6RVizT1GRrJBNGOJ_WnZ7WFBBBWmxkTEVgGxta3Nr4Q5g0g0-ku3Ie7vic/exec";
   const API_KEY  = "";
-  const PASSWORD = "038491";
   const COOLDOWN = 3000;
+  const IN_TO_OUT_WAIT = 60000; // 入室後1分間は退室処理しない
 
-  const msgEl   = document.getElementById("message");
-  let lastCode  = null;
-  let lastTime  = 0;
+  const msgEl  = document.getElementById("message");
+  let lastCode = null;
+  let lastTime = 0;
+  let lastType = null; // 直近の処理がINかOUTか
+  let lastTypeTime = 0; // 直近の処理時刻
   let isSending = false;
   let isLocked  = false;
 
-  // ======== メッセージ表示 ========
+  // ======== メッセージ ========
   function showMessage(text, type) {
     msgEl.textContent = text;
     msgEl.className   = `show ${type}`;
     clearTimeout(msgEl._timer);
-    msgEl._timer = setTimeout(() => {
-      msgEl.className = "";
-    }, 3000);
+    msgEl._timer = setTimeout(() => { msgEl.className = ""; }, 3000);
   }
 
   // ======== QRスキャン ========
@@ -179,12 +196,18 @@
     if (qrCode === lastCode && now - lastTime < COOLDOWN) return;
     if (isSending) return;
 
+    // 入室後1分以内の退室処理をブロック
+    if (lastType === "IN" && now - lastTypeTime < IN_TO_OUT_WAIT) {
+      showMessage(`すでに入室は完了しています。\n退室する場合は時間をおいてから再度QRを読み取ってください。`, "err");
+      return;
+    }
+
     lastCode  = qrCode;
     lastTime  = now;
     isSending = true;
 
     try {
-      const res  = await fetch(GAS_URL, {
+      const res = await fetch(GAS_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({
@@ -200,30 +223,34 @@
       const name = data.name || qrCode;
       const type = data.type;
 
+      lastType     = type;
+      lastTypeTime = Date.now();
+
       if (type === "IN") {
         showMessage(`${name}さん、こんにちは。\n入室を確認しました。`, "in");
       } else {
         showMessage(`${name}さん、おつかれさまでした。\n退室を確認しました。`, "out");
       }
 
-    } catch (e) {
+    } catch {
       showMessage("送信失敗。通信を確認してください。", "err");
     } finally {
       isSending = false;
     }
   }
 
-  // ======== ロック機能 ========
-  function toggleLock() {
+  // ======== ロック ========
+  function handleLockBtn() {
     if (!isLocked) {
       // ロックをかける
       isLocked = true;
       document.body.classList.add("locked");
-      document.getElementById("lock-btn").textContent = "🔒";
+      document.getElementById("icon-unlocked").style.display = "none";
+      document.getElementById("icon-locked").style.display   = "block";
       document.getElementById("lock-overlay").classList.add("show");
       document.getElementById("pw-input").focus();
     } else {
-      // ロック中にボタンを押してもオーバーレイを再表示するだけ
+      // すでにロック中→オーバーレイを表示
       document.getElementById("lock-overlay").classList.add("show");
       document.getElementById("pw-input").focus();
     }
@@ -231,10 +258,11 @@
 
   function checkPassword() {
     const val = document.getElementById("pw-input").value;
-    if (val === PASSWORD) {
+    if (val === "038491") {
       isLocked = false;
       document.body.classList.remove("locked");
-      document.getElementById("lock-btn").textContent = "🔓";
+      document.getElementById("icon-unlocked").style.display = "block";
+      document.getElementById("icon-locked").style.display   = "none";
       document.getElementById("lock-overlay").classList.remove("show");
       document.getElementById("pw-input").value = "";
       document.getElementById("pw-error").textContent = "";
@@ -245,12 +273,12 @@
     }
   }
 
-  // ======== html5-qrcode 起動 ========
+  // ======== html5-qrcode ========
   const html5QrCode = new Html5QrcodeScanner(
     "reader",
     {
       fps: 10,
-      qrbox: { width: 250, height: 250 },
+      qrbox: { width: 280, height: 280 },
       rememberLastUsedCamera: true,
       showTorchButtonIfSupported: true
     },
