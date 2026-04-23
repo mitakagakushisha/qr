@@ -1,1 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>在室確認</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    body {
+      font-family: sans-serif;
+      background: #f0f2f5;
+      padding: 20px;
+    }
+
+    h2 {
+      font-size: 20px;
+      color: #333;
+      margin-bottom: 4px;
+    }
+
+    #updated {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 16px;
+    }
+
+    #count {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    thead {
+      background: #4a90d9;
+      color: #fff;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 15px;
+      border-bottom: 1px solid #eee;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    tbody tr:hover { background: #f7f9fc; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .badge-in  { background: #d4edda; color: #1a7a3f; }
+
+    .long { color: #c0392b; font-weight: bold; }
+
+    #empty {
+      text-align: center;
+      padding: 40px;
+      color: #aaa;
+      font-size: 16px;
+      display: none;
+    }
+
+    #reload {
+      margin-bottom: 16px;
+      padding: 8px 20px;
+      font-size: 14px;
+      background: #4a90d9;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #reload:active { background: #357abd; }
+
+    #error {
+      color: #c0392b;
+      font-size: 14px;
+      margin-bottom: 12px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<h2>在室中の塾生</h2>
+<div id="updated"></div>
+<div id="error">データの取得に失敗しました。通信を確認してください。</div>
+<div id="count"></div>
+<button id="reload" onclick="load()">再読み込み</button>
+
+<table id="table">
+  <thead>
+    <tr>
+      <th>氏名</th>
+      <th>塾生番号</th>
+      <th>入室時刻</th>
+      <th>滞在時間</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<div id="empty">現在在室中の塾生はいません</div>
+
+<script>
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbwjyfkI6m6RVizT1GRrJBNGOJ_WnZ7WFBBBWmxkTEVgGxta3Nr4Q5g0g0-ku3Ie7vic/exec"; // qr.htmlと同じURLでOK
+
+  async function load() {
+    document.getElementById("error").style.display = "none";
+    document.getElementById("reload").textContent = "読み込み中...";
+
+    try {
+      const res  = await fetch(GAS_URL + "?t=" + Date.now()); // キャッシュ回避
+      const list = await res.json();
+
+      const tbody = document.getElementById("tbody");
+      tbody.innerHTML = "";
+
+      if (list.length === 0) {
+        document.getElementById("table").style.display = "none";
+        document.getElementById("empty").style.display = "block";
+        document.getElementById("count").textContent = "";
+      } else {
+        document.getElementById("table").style.display = "table";
+        document.getElementById("empty").style.display = "none";
+        document.getElementById("count").textContent = `在室中：${list.length}名`;
+
+        for (const s of list) {
+          const tr = document.createElement("tr");
+          const longStay = s.minutes >= 180; // 3時間以上で赤表示
+          const h = Math.floor(s.minutes / 60);
+          const m = s.minutes % 60;
+          const stayText = h > 0 ? `${h}時間${m}分` : `${m}分`;
+
+          tr.innerHTML = `
+            <td>${s.name}</td>
+            <td>${s.studentId}</td>
+            <td><span class="badge badge-in">IN</span> ${s.inTime}</td>
+            <td class="${longStay ? "long" : ""}">${stayText}${longStay ? " ⚠" : ""}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+      }
+
+      const now = new Date();
+      document.getElementById("updated").textContent =
+        `最終更新：${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`;
+
+    } catch (e) {
+      document.getElementById("error").style.display = "block";
+    } finally {
+      document.getElementById("reload").textContent = "再読み込み";
+    }
+  }
+
+  // 初回読み込み
+  load();
+
+  // 2分ごとに自動更新
+  setInterval(load, 120000);
+</script>
+</body>
+</html>
