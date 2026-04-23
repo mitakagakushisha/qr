@@ -81,10 +81,11 @@
     try {
       const res = await fetch(GAS_URL, {
   method: "POST",
-  body: new URLSearchParams({
-    jukusei:   qrCode,
-    timestamp: new Date().toISOString(),
-    api_key:   API_KEY
+  headers: { "Content-Type": "text/plain" },
+  body: JSON.stringify({
+    student_id: qrCode,
+    timestamp:  new Date().toISOString(),
+    api_key:    API_KEY
   })
 });
 
