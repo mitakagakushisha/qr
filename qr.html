@@ -255,6 +255,7 @@
       // 1回目：シールドをかけるだけ。パスワード画面は出さない
       isLocked = true;
       document.getElementById("lock-shield").classList.add("show");
+      document.body.style.overflow = "hidden";
       document.getElementById("icon-unlocked").style.display = "none";
       document.getElementById("icon-locked").style.display   = "block";
     } else {
@@ -269,6 +270,7 @@
     if (val === "038491") {
       isLocked = false;
       document.getElementById("lock-shield").classList.remove("show");
+      document.body.style.overflow = "";
       document.getElementById("lock-overlay").classList.remove("show");
       document.getElementById("icon-unlocked").style.display = "block";
       document.getElementById("icon-locked").style.display   = "none";
@@ -292,6 +294,21 @@
     },
     false
   );
+
+  // ロック中は南京錠以外のタッチ・クリックをすべてキャンセル
+  document.addEventListener("touchstart", function(e) {
+    if (isLocked && !document.getElementById("lock-btn").contains(e.target) && !document.getElementById("lock-overlay").contains(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, { passive: false, capture: true });
+
+  document.addEventListener("mousedown", function(e) {
+    if (isLocked && !document.getElementById("lock-btn").contains(e.target) && !document.getElementById("lock-overlay").contains(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, { capture: true });
 
   html5QrCode.render(onScanSuccess, () => {});
 </script>
