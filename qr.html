@@ -20,11 +20,18 @@
   const GAS_URL = "★あなたのGASのURL★";
   const API_KEY = "★あなたのAPIキー★";
 
-  const video = document.getElementById("camera");
+  // ★ 修正ポイント：camera → video
+  const video = document.getElementById("video");
   const result = document.getElementById("result");
 
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-    .then(stream => video.srcObject = stream);
+  // インカメにする
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user" }
+  })
+  .then(stream => {
+    video.srcObject = stream;
+    video.play();
+  });
 
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
@@ -36,29 +43,4 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, canvas.width, canvas.height);
-
-      if (code) {
-        const jukusei = code.data;
-
-        fetch(GAS_URL, {
-          method: "POST",
-          body: JSON.stringify({
-            jukusei: jukusei,
-            timestamp: new Date().toISOString(),
-            api_key: API_KEY
-          })
-        });
-
-        result.textContent = `読み取り：${jukusei}`;
-        setTimeout(() => result.textContent = "", 2000);
-      }
-    }
-    requestAnimationFrame(scan);
-  }
-
-  scan();
-</script>
-
-</body>
-</html>
+      const code
