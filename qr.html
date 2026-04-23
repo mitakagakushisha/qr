@@ -2,80 +2,29 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>QR 入退室記録</title>
-  <style>
-    body { font-family: sans-serif; text-align: center; }
-    video { width: 75%; height: auto; margin-top: 20px; }
-    #result { font-size: 24px; margin-top: 20px; }
-    #switchBtn { margin-top: 10px; padding: 8px 16px; font-size: 16px; }
-  </style>
+  <title>Camera Debug</title>
 </head>
 <body>
 
-<h2>QR 入退室記録</h2>
-<video id="video"></video>
-<br>
-<button id="switchBtn">外カメに切り替え</button>
-<div id="result"></div>
+<h2>カメラ一覧（デバッグ）</h2>
+<pre id="out">読み込み中...</pre>
 
 <script type="module">
   import { BrowserQRCodeReader } from "https://cdn.jsdelivr.net/npm/@zxing/browser@latest";
 
-  const GAS_URL = "★あなたのGASのURL★";
-  const API_KEY = "★あなたのAPIキー★";
+  const out = document.getElementById("out");
 
-  const video = document.getElementById("video");
-  const result = document.getElementById("result");
-  const switchBtn = document.getElementById("switchBtn");
+  async function debug() {
+    try {
+      const devices = await BrowserQRCodeReader.listVideoInputDevices();
 
-  let currentCameraIndex = 0; // 0 = インカメ、1 = 外カメ
-  let devices = [];
-  let codeReader = new BrowserQRCodeReader();
-
-  async function startCamera() {
-    // デバイス一覧取得
-    devices = await BrowserQRCodeReader.listVideoInputDevices();
-
-    if (devices.length === 0) {
-      result.textContent = "カメラが見つかりません";
-      return;
+      out.textContent = JSON.stringify(devices, null, 2);
+    } catch (e) {
+      out.textContent = "エラー: " + e;
     }
-
-    // インカメ＝0番、外カメ＝1番（なければ0番）
-    const device = devices[currentCameraIndex] || devices[0];
-
-    codeReader.decodeFromVideoDevice(device.deviceId, video, (res, err) => {
-      if (res) {
-        const jukusei = res.getText();
-
-        result.textContent = `読み取り：${jukusei}`;
-
-        fetch(GAS_URL, {
-          method: "POST",
-          body: JSON.stringify({
-            jukusei: jukusei,
-            timestamp: new Date().toISOString(),
-            api_key: API_KEY
-          })
-        });
-
-        setTimeout(() => result.textContent = "", 2000);
-      }
-    });
   }
 
-  // 初期起動（インカメ＝0番）
-  startCamera();
-
-  // カメラ切り替え
-  switchBtn.onclick = () => {
-    currentCameraIndex = currentCameraIndex === 0 ? 1 : 0;
-    switchBtn.textContent =
-      currentCameraIndex === 0 ? "外カメに切り替え" : "インカメに切り替え";
-
-    codeReader.reset();
-    startCamera();
-  };
+  debug();
 </script>
 
 </body>
