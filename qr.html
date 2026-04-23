@@ -80,14 +80,13 @@
 
     try {
       const res = await fetch(GAS_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jukusei:   qrCode,
-          timestamp: new Date().toISOString(),
-          api_key:   API_KEY
-        })
-      });
+  method: "POST",
+  body: new URLSearchParams({
+    jukusei:   qrCode,
+    timestamp: new Date().toISOString(),
+    api_key:   API_KEY
+  })
+});
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
