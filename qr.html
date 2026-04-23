@@ -24,7 +24,6 @@
       margin-bottom: 16px;
     }
 
-    /* カメラ＋メッセージのラッパー */
     #reader-wrapper {
       position: relative;
       width: min(90vw, 680px);
@@ -37,7 +36,6 @@
       border: 2px solid #ccc;
     }
 
-    /* メッセージ：映像の上部に重なって表示 */
     #message {
       position: absolute;
       top: 16px;
@@ -61,22 +59,20 @@
     }
 
     #message.show { opacity: 1; }
-    #message.in  { background: rgba(212, 237, 218, 0.95); color: #1a7a3f; }
-    #message.out { background: rgba(248, 215, 218, 0.95); color: #a93226; }
-    #message.err { background: rgba(226, 227, 229, 0.95); color: #555; font-size: 15px; }
+    #message.in      { background: rgba(212, 237, 218, 0.95); color: #1a7a3f; }
+    #message.out     { background: rgba(248, 215, 218, 0.95); color: #a93226; }
+    #message.err     { background: rgba(226, 227, 229, 0.95); color: #555; font-size: 15px; }
+    #message.sending { background: rgba(210, 230, 250, 0.95); color: #1a4a7a; font-size: 16px; }
 
-    /* ロック中のオーバーレイ（映像には重ねない・操作だけブロック） */
     #lock-shield {
       display: none;
       position: fixed;
       inset: 0;
       z-index: 120;
-      /* 透明だが操作をブロック */
       background: transparent;
     }
     #lock-shield.show { display: block; }
 
-    /* 南京錠ボタン */
     #lock-btn {
       position: fixed;
       bottom: 24px;
@@ -96,7 +92,6 @@
     #lock-btn:active { background: #eee; }
     #lock-btn svg { width: 28px; height: 28px; }
 
-    /* ロック解除オーバーレイ */
     #lock-overlay {
       display: none;
       position: fixed;
@@ -147,14 +142,11 @@
 
 <div id="reader-wrapper">
   <div id="reader"></div>
-  <!-- メッセージは映像に重なって表示 -->
   <div id="message"></div>
 </div>
 
-<!-- 透明シールド：ロック中に操作をブロック（映像は見える） -->
 <div id="lock-shield"></div>
 
-<!-- 南京錠ボタン（シールドより上のz-index） -->
 <button id="lock-btn" onclick="handleLockBtn()" title="ロック切り替え">
   <svg id="icon-unlocked" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -166,7 +158,6 @@
   </svg>
 </button>
 
-<!-- ロック解除オーバーレイ -->
 <div id="lock-overlay">
   <p>🔒 ロック中</p>
   <p style="font-size:13px; color:#aaa;">パスワードを入力してロックを解除</p>
@@ -179,33 +170,46 @@
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
-  const GAS_URL        = "https://script.google.com/macros/s/AKfycbwjyfkI6m6RVizT1GRrJBNGOJ_WnZ7WFBBBWmxkTEVgGxta3Nr4Q5g0g0-ku3Ie7vic/exec";
+  const GAS_URL        = "★あなたのGASのURL★";
   const API_KEY        = "";
   const COOLDOWN       = 3000;
   const IN_TO_OUT_WAIT = 60000;
+  const MSG_DURATION   = 3000; // メッセージ表示時間（ms）
 
-  const msgEl      = document.getElementById("message");
-  let lastCode     = null;
-  let lastTime     = 0;
-  let lastType     = null;
-  let lastTypeTime = 0;
-  let isSending    = false;
-  let isLocked     = false;
+  const msgEl        = document.getElementById("message");
+  let lastCode       = null;
+  let lastTime       = 0;
+  let lastType       = null;
+  let lastTypeTime   = 0;
+  let isSending      = false;
+  let isLocked       = false;
+  let msgShowing     = false; // メッセージ表示中フラグ
+  let msgTimer       = null;
 
   // ======== メッセージ ========
-  function showMessage(text, type) {
+  function showMessage(text, type, duration = MSG_DURATION) {
     msgEl.textContent = text;
     msgEl.className   = `show ${type}`;
-    clearTimeout(msgEl._timer);
-    msgEl._timer = setTimeout(() => { msgEl.className = ""; }, 3000);
+    msgShowing        = true;
+    clearTimeout(msgTimer);
+    msgTimer = setTimeout(() => {
+      msgEl.className = "";
+      msgShowing      = false;
+    }, duration);
   }
 
-  // ======== QRスキャン（ロック中も動作） ========
+  // ======== QRスキャン ========
   async function onScanSuccess(qrCode) {
     const now = Date.now();
+
+    // COOLDOWNチェック（同一QRの連打防止）
     if (qrCode === lastCode && now - lastTime < COOLDOWN) return;
     if (isSending) return;
 
+    // メッセージ表示中は新しい読み取りを受け付けない（A・B両方のケアで）
+    if (msgShowing) return;
+
+    // 入退室後1分以内の連続読み取りチェック
     if (lastType !== null && now - lastTypeTime < IN_TO_OUT_WAIT) {
       const action = lastType === "IN" ? "入室" : "退室";
       showMessage(`すでに${action}は完了しています。\n次の読み取りは時間をおいてから行ってください。`, "err");
@@ -215,6 +219,9 @@
     lastCode  = qrCode;
     lastTime  = now;
     isSending = true;
+
+    // 読み取り直後に中間メッセージを表示（ラグを体感的に短縮）
+    showMessage("読み取りました。送信中...", "sending", 10000);
 
     try {
       const res = await fetch(GAS_URL, {
@@ -252,14 +259,12 @@
   // ======== ロック ========
   function handleLockBtn() {
     if (!isLocked) {
-      // 1回目：シールドをかけるだけ。パスワード画面は出さない
       isLocked = true;
       document.getElementById("lock-shield").classList.add("show");
       document.body.style.overflow = "hidden";
       document.getElementById("icon-unlocked").style.display = "none";
       document.getElementById("icon-locked").style.display   = "block";
     } else {
-      // 2回目：パスワード入力画面を出す
       document.getElementById("lock-overlay").classList.add("show");
       document.getElementById("pw-input").focus();
     }
@@ -283,19 +288,7 @@
     }
   }
 
-  // ======== html5-qrcode ========
-  const html5QrCode = new Html5QrcodeScanner(
-    "reader",
-    {
-      fps: 10,
-      qrbox: { width: 280, height: 280 },
-      rememberLastUsedCamera: true,
-      showTorchButtonIfSupported: true
-    },
-    false
-  );
-
-  // ロック中は南京錠以外のタッチ・クリックをすべてキャンセル
+  // ロック中は南京錠・オーバーレイ以外の操作をすべてキャンセル
   document.addEventListener("touchstart", function(e) {
     if (isLocked && !document.getElementById("lock-btn").contains(e.target) && !document.getElementById("lock-overlay").contains(e.target)) {
       e.preventDefault();
@@ -309,6 +302,25 @@
       e.stopPropagation();
     }
   }, { capture: true });
+
+  // ======== GASウォームアップ（5分おきにアクセスしてコールドスタートを防ぐ） ========
+  function warmupGAS() {
+    fetch(GAS_URL + "?action=warmup&t=" + Date.now()).catch(() => {});
+  }
+  warmupGAS();
+  setInterval(warmupGAS, 5 * 60 * 1000);
+
+  // ======== html5-qrcode ========
+  const html5QrCode = new Html5QrcodeScanner(
+    "reader",
+    {
+      fps: 10,
+      qrbox: { width: 280, height: 280 },
+      rememberLastUsedCamera: true,
+      showTorchButtonIfSupported: true
+    },
+    false
+  );
 
   html5QrCode.render(onScanSuccess, () => {});
 </script>
