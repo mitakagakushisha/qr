@@ -7,12 +7,15 @@
     body { font-family: sans-serif; text-align: center; }
     video { width: 75%; height: auto; margin-top: 20px; }
     #result { font-size: 24px; margin-top: 20px; }
+    #switchBtn { margin-top: 10px; padding: 8px 16px; font-size: 16px; }
   </style>
 </head>
 <body>
 
 <h2>QR 入退室記録</h2>
 <video id="video"></video>
+<br>
+<button id="switchBtn">外カメに切り替え</button>
 <div id="result"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
@@ -22,27 +25,42 @@
 
   const video = document.getElementById("video");
   const result = document.getElementById("result");
+  const switchBtn = document.getElementById("switchBtn");
 
-  // ★ インカメで起動
-  navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "user" }
-  })
-  .then(stream => {
-    video.srcObject = stream;
-    video.play();
-  })
-  .catch(err => {
-    console.error("カメラ起動エラー:", err);
-    result.textContent = "カメラを起動できませんでした";
-  });
+  let currentCamera = "user"; // 最初はインカメ
+
+  function startCamera() {
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: currentCamera }
+    })
+    .then(stream => {
+      video.srcObject = stream;
+      video.play();
+    })
+    .catch(err => {
+      console.error("カメラ起動エラー:", err);
+      result.textContent = "カメラを起動できませんでした";
+    });
+  }
+
+  // 初期起動（インカメ）
+  startCamera();
+
+  // カメラ切り替え
+  switchBtn.onclick = () => {
+    currentCamera = currentCamera === "user" ? "environment" : "user";
+    switchBtn.textContent = currentCamera === "user" ? "外カメに切り替え" : "インカメに切り替え";
+    startCamera();
+  };
 
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
 
   function scan() {
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = video.videoWidth * 0.7;  // ← インカメ対策：縮小して認識率UP
+      canvas.height = video.videoHeight * 0.7;
+
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -67,8 +85,7 @@
     requestAnimationFrame(scan);
   }
 
-  scan(canvas.width = video.videoWidth * 0.6;
-canvas.height = video.videoHeight * 0.6;);
+  scan();
 </script>
 
 </body>
