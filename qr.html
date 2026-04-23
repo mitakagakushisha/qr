@@ -18,8 +18,9 @@
 <button id="switchBtn">外カメに切り替え</button>
 <div id="result"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
-<script>
+<script type="module">
+  import { BrowserQRCodeReader } from "https://cdn.jsdelivr.net/npm/@zxing/browser@latest";
+
   const GAS_URL = "★あなたのGASのURL★";
   const API_KEY = "★あなたのAPIキー★";
 
@@ -28,76 +29,26 @@
   const switchBtn = document.getElementById("switchBtn");
 
   let currentCamera = "user"; // 最初はインカメ
-  let currentStream = null;
-  let scanning = false;
+  let codeReader = new BrowserQRCodeReader();
+  let currentDeviceId = null;
 
   async function startCamera() {
-    if (currentStream) {
-      currentStream.getTracks().forEach(track => track.stop());
-    }
+    const devices = await BrowserQRCodeReader.listVideoInputDevices();
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: currentCamera }
-      });
+    // インカメ or 外カメを選択
+    const device = devices.find(d =>
+      currentCamera === "user"
+        ? d.label.toLowerCase().includes("front")
+        : d.label.toLowerCase().includes("back")
+    ) || devices[0];
 
-      currentStream = stream;
-      video.srcObject = stream;
+    currentDeviceId = device.deviceId;
 
-      await video.play();
+    codeReader.decodeFromVideoDevice(currentDeviceId, video, (res, err) => {
+      if (res) {
+        const jukusei = res.getText();
 
-      if (!scanning) {
-        scanning = true;
-        requestAnimationFrame(scan);
-      }
-
-    } catch (err) {
-      console.error("カメラ起動エラー:", err);
-      result.textContent = "カメラを起動できませんでした";
-    }
-  }
-
-  startCamera();
-
-  switchBtn.onclick = () => {
-    currentCamera = currentCamera === "user" ? "environment" : "user";
-    switchBtn.textContent = currentCamera === "user" ? "外カメに切り替え" : "インカメに切り替え";
-    startCamera();
-  };
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-
-  function scan() {
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-
-      let w = video.videoWidth;
-      let h = video.videoHeight;
-
-      // ★ videoWidth が 0 の場合の対策
-      if (w === 0 || h === 0) {
-        w = 640;
-        h = 480;
-      }
-
-      canvas.width = w;
-      canvas.height = h;
-
-      // ★ インカメはミラー反転して描画
-      if (currentCamera === "user") {
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, -w, 0, w, h);
-        ctx.restore();
-      } else {
-        ctx.drawImage(video, 0, 0, w, h);
-      }
-
-      const imageData = ctx.getImageData(0, 0, w, h);
-      const code = jsQR(imageData.data, w, h);
-
-      if (code) {
-        const jukusei = code.data;
+        result.textContent = `読み取り：${jukusei}`;
 
         fetch(GAS_URL, {
           method: "POST",
@@ -108,13 +59,23 @@
           })
         });
 
-        result.textContent = `読み取り：${jukusei}`;
         setTimeout(() => result.textContent = "", 2000);
       }
-    }
-
-    requestAnimationFrame(scan);
+    });
   }
+
+  // 初期起動
+  startCamera();
+
+  // カメラ切り替え
+  switchBtn.onclick = () => {
+    currentCamera = currentCamera === "user" ? "environment" : "user";
+    switchBtn.textContent =
+      currentCamera === "user" ? "外カメに切り替え" : "インカメに切り替え";
+
+    codeReader.reset();
+    startCamera();
+  };
 </script>
 
 </body>
