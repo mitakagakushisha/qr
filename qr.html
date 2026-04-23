@@ -1,84 +1,122 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QR 入退室記録</title>
   <style>
-    body { font-family: sans-serif; text-align: center; }
-    video { width: 75%; height: auto; margin-top: 20px; }
-    #result { font-size: 24px; margin-top: 20px; }
-    #switchBtn { margin-top: 10px; padding: 8px 16px; font-size: 16px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    h2 {
+      margin: 16px 0 16px;
+      font-size: 20px;
+      color: #333;
+    }
+
+    #reader {
+      width: min(75vw, 480px);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-size: 22px;
+      font-weight: bold;
+      min-height: 36px;
+      color: #333;
+    }
+
+    #status.success { color: #1a7a3f; }
+    #status.error   { color: #c0392b; }
+    #status.sending { color: #2471a3; }
   </style>
 </head>
 <body>
 
 <h2>QR 入退室記録</h2>
-<video id="video" muted playsinline></video>
-<br>
-<button id="switchBtn">外カメに切り替え</button>
-<div id="result"></div>
+<div id="reader"></div>
+<div id="status"></div>
 
-<!-- QRScanner.js -->
-<script src="https://unpkg.com/qr-scanner/qr-scanner.min.js"></script>
-
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
-  const GAS_URL = "★あなたのGASのURL★";
-  const API_KEY = "★あなたのAPIキー★";
+  const GAS_URL  = "★あなたのGASのURL★";
+  const API_KEY  = "★あなたのAPIキー★";
+  const COOLDOWN = 3000; // 同一QRを再送するまでの待機時間（ミリ秒）
 
-  const video = document.getElementById("video");
-  const result = document.getElementById("result");
-  const switchBtn = document.getElementById("switchBtn");
+  const statusEl = document.getElementById("status");
+  let lastCode = null;
+  let lastTime = 0;
+  let isSending = false;
 
-  let currentCamera = 0; // 0 = インカメ、1 = 外カメ
-  let cameras = [];
-  let scanner = null;
-
-  async function startScanner() {
-    cameras = await QrScanner.listCameras(true);
-
-    if (cameras.length === 0) {
-      result.textContent = "カメラが見つかりません";
-      return;
-    }
-
-    const camId = cameras[currentCamera]?.id || cameras[0].id;
-
-    if (scanner) scanner.destroy();
-
-    scanner = new QrScanner(
-      video,
-      qr => {
-        result.textContent = `読み取り：${qr}`;
-
-        fetch(GAS_URL, {
-          method: "POST",
-          body: JSON.stringify({
-            jukusei: qr,
-            timestamp: new Date().toISOString(),
-            api_key: API_KEY
-          })
-        });
-
-        setTimeout(() => result.textContent = "", 2000);
-      },
-      { preferredCamera: camId }
-    );
-
-    scanner.start();
+  function setStatus(msg, cls = "") {
+    statusEl.textContent = msg;
+    statusEl.className = cls;
   }
 
-  // 初期起動
-  startScanner();
+  async function onScanSuccess(qrCode) {
+    const now = Date.now();
 
-  // カメラ切り替え
-  switchBtn.onclick = () => {
-    currentCamera = currentCamera === 0 ? 1 : 0;
-    switchBtn.textContent =
-      currentCamera === 0 ? "外カメに切り替え" : "インカメに切り替え";
+    // 同一QRの連打防止
+    if (qrCode === lastCode && now - lastTime < COOLDOWN) return;
+    // 送信中は無視
+    if (isSending) return;
 
-    startScanner();
-  };
+    lastCode = qrCode;
+    lastTime = now;
+    isSending = true;
+
+    setStatus("送信中...", "sending");
+
+    try {
+      const res = await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jukusei:   qrCode,
+          timestamp: new Date().toISOString(),
+          api_key:   API_KEY
+        })
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      setStatus(`✓ ${qrCode}`, "success");
+    } catch (e) {
+      console.error(e);
+      setStatus("送信失敗。通信を確認してください。", "error");
+    } finally {
+      isSending = false;
+      setTimeout(() => setStatus(""), 2500);
+    }
+  }
+
+  function onScanFailure(error) {
+    // フレームごとの読み取り失敗は無視（コンソールにも出さない）
+  }
+
+  const html5QrCode = new Html5QrcodeScanner(
+    "reader",
+    {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      rememberLastUsedCamera: true,
+      showTorchButtonIfSupported: true
+    },
+    false // verbose
+  );
+
+  html5QrCode.render(onScanSuccess, onScanFailure);
 </script>
-
 </body>
 </html>
