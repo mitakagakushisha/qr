@@ -18,11 +18,7 @@
       user-select: none;
     }
 
-    h2 {
-      color: #333;
-      font-size: 20px;
-      margin-bottom: 16px;
-    }
+    h2 { color: #333; font-size: 20px; margin-bottom: 16px; }
 
     #reader-wrapper {
       position: relative;
@@ -36,7 +32,8 @@
       border: 2px solid #ccc;
     }
 
-    #message {
+    /* 入退室メッセージ：映像上部に重なって表示 */
+    #message-top {
       position: absolute;
       top: 16px;
       left: 50%;
@@ -58,11 +55,36 @@
       pointer-events: none;
     }
 
-    #message.show { opacity: 1; }
-    #message.in      { background: rgba(212, 237, 218, 0.95); color: #1a7a3f; }
-    #message.out     { background: rgba(248, 215, 218, 0.95); color: #a93226; }
-    #message.err     { background: rgba(226, 227, 229, 0.95); color: #555; font-size: 15px; }
-    #message.sending { background: rgba(210, 230, 250, 0.95); color: #1a4a7a; font-size: 16px; }
+    /* はじくメッセージ：映像下部に重なって表示 */
+    #message-bottom {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: center;
+      padding: 10px 14px;
+      line-height: 1.5;
+      white-space: pre-line;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    #message-top.show { opacity: 1; }
+    #message-bottom.show { opacity: 1; }
+
+    #message-top.in      { background: rgba(212, 237, 218, 0.95); color: #1a7a3f; }
+    #message-top.out     { background: rgba(248, 215, 218, 0.95); color: #a93226; }
+    #message-top.sending { background: rgba(210, 230, 250, 0.95); color: #1a4a7a; font-size: 16px; }
+    #message-bottom.err  { background: rgba(226, 227, 229, 0.95); color: #555; }
 
     #lock-shield {
       display: none;
@@ -118,11 +140,7 @@
       color: #fff;
     }
 
-    #pw-error {
-      color: #e74c3c;
-      font-size: 14px;
-      min-height: 20px;
-    }
+    #pw-error { color: #e74c3c; font-size: 14px; min-height: 20px; }
 
     #pw-submit {
       padding: 10px 28px;
@@ -142,7 +160,8 @@
 
 <div id="reader-wrapper">
   <div id="reader"></div>
-  <div id="message"></div>
+  <div id="message-top"></div>
+  <div id="message-bottom"></div>
 </div>
 
 <div id="lock-shield"></div>
@@ -172,56 +191,55 @@
 <script>
   const GAS_URL        = "https://script.google.com/macros/s/AKfycbwjyfkI6m6RVizT1GRrJBNGOJ_WnZ7WFBBBWmxkTEVgGxta3Nr4Q5g0g0-ku3Ie7vic/exec";
   const API_KEY        = "";
-  const COOLDOWN       = 3000;
-  const IN_TO_OUT_WAIT = 60000;
-  const MSG_DURATION   = 3000; // メッセージ表示時間（ms）
+  const IN_TO_OUT_WAIT = 60000; // 入退室後の次読み取りまでの待機（ms）
+  const SCAN_PAUSE     = 3000;  // 読み取り後にスキャンを止める時間（ms）
+  const MSG_DURATION   = 3000;  // メッセージ表示時間（ms）
 
-  const msgEl        = document.getElementById("message");
-  let lastCode       = null;
-  let lastTime       = 0;
-  let lastType       = null;
-  let lastTypeTime   = 0;
-  let isSending      = false;
-  let isLocked       = false;
-  let msgShowing     = false; // メッセージ表示中フラグ
-  let msgTimer       = null;
+  const msgTop    = document.getElementById("message-top");
+  const msgBottom = document.getElementById("message-bottom");
 
-  // ======== メッセージ ========
-  function showMessage(text, type, duration = MSG_DURATION) {
-    msgEl.textContent = text;
-    msgEl.className   = `show ${type}`;
-    msgShowing        = true;
-    clearTimeout(msgTimer);
-    msgTimer = setTimeout(() => {
-      msgEl.className = "";
-      msgShowing      = false;
-    }, duration);
+  let lastType     = null;
+  let lastTypeTime = 0;
+  let isSending    = false;
+  let isLocked     = false;
+  let scanPaused   = false; // スキャン一時停止フラグ
+  let topTimer     = null;
+  let bottomTimer  = null;
+
+  function showTop(text, type, duration = MSG_DURATION) {
+    msgTop.textContent = text;
+    msgTop.className   = `show ${type}`;
+    clearTimeout(topTimer);
+    topTimer = setTimeout(() => { msgTop.className = ""; }, duration);
   }
 
-  // ======== QRスキャン ========
+  function showBottom(text, duration = MSG_DURATION) {
+    msgBottom.textContent = text;
+    msgBottom.className   = "show err";
+    clearTimeout(bottomTimer);
+    bottomTimer = setTimeout(() => { msgBottom.className = ""; }, duration);
+  }
+
   async function onScanSuccess(qrCode) {
+    // スキャン一時停止中は完全無視（二重読み取り防止）
+    if (scanPaused) return;
+    if (isSending)  return;
+
     const now = Date.now();
 
-    // COOLDOWNチェック（同一QRの連打防止）
-    if (qrCode === lastCode && now - lastTime < COOLDOWN) return;
-    if (isSending) return;
-
-    // メッセージ表示中は新しい読み取りを受け付けない（A・B両方のケアで）
-    if (msgShowing) return;
-
-    // 入退室後1分以内の連続読み取りチェック
+    // 入退室後の待機チェック（同一人物の連続処理防止）
     if (lastType !== null && now - lastTypeTime < IN_TO_OUT_WAIT) {
       const action = lastType === "IN" ? "入室" : "退室";
-      showMessage(`すでに${action}は完了しています。\n次の読み取りは時間をおいてから行ってください。`, "err");
+      showBottom(`すでに${action}は完了しています。\n次の読み取りは時間をおいてから行ってください。`);
       return;
     }
 
-    lastCode  = qrCode;
-    lastTime  = now;
-    isSending = true;
+    // 読み取り確定 → スキャンをSCAN_PAUSE秒止めて二重読み取りを防ぐ
+    scanPaused = true;
+    setTimeout(() => { scanPaused = false; }, SCAN_PAUSE);
 
-    // 読み取り直後に中間メッセージを表示（ラグを体感的に短縮）
-    showMessage("読み取りました。送信中...", "sending", 10000);
+    isSending = true;
+    showTop("読み取りました。送信中...", "sending", 10000);
 
     try {
       const res = await fetch(GAS_URL, {
@@ -244,19 +262,18 @@
       lastTypeTime = Date.now();
 
       if (type === "IN") {
-        showMessage(`${name}さん、こんにちは。\n入室を確認しました。`, "in");
+        showTop(`${name}さん、こんにちは。\n入室を確認しました。`, "in");
       } else {
-        showMessage(`${name}さん、おつかれさまでした。\n退室を確認しました。`, "out");
+        showTop(`${name}さん、おつかれさまでした。\n退室を確認しました。`, "out");
       }
 
     } catch {
-      showMessage("送信失敗。通信を確認してください。", "err");
+      showTop("送信失敗。通信を確認してください。", "err");
     } finally {
       isSending = false;
     }
   }
 
-  // ======== ロック ========
   function handleLockBtn() {
     if (!isLocked) {
       isLocked = true;
@@ -288,7 +305,6 @@
     }
   }
 
-  // ロック中は南京錠・オーバーレイ以外の操作をすべてキャンセル
   document.addEventListener("touchstart", function(e) {
     if (isLocked && !document.getElementById("lock-btn").contains(e.target) && !document.getElementById("lock-overlay").contains(e.target)) {
       e.preventDefault();
@@ -303,25 +319,17 @@
     }
   }, { capture: true });
 
-  // ======== GASウォームアップ（5分おきにアクセスしてコールドスタートを防ぐ） ========
   function warmupGAS() {
     fetch(GAS_URL + "?action=warmup&t=" + Date.now()).catch(() => {});
   }
   warmupGAS();
   setInterval(warmupGAS, 5 * 60 * 1000);
 
-  // ======== html5-qrcode ========
   const html5QrCode = new Html5QrcodeScanner(
     "reader",
-    {
-      fps: 10,
-      qrbox: { width: 280, height: 280 },
-      rememberLastUsedCamera: true,
-      showTorchButtonIfSupported: true
-    },
+    { fps: 10, qrbox: { width: 280, height: 280 }, rememberLastUsedCamera: true, showTorchButtonIfSupported: true },
     false
   );
-
   html5QrCode.render(onScanSuccess, () => {});
 </script>
 </body>
