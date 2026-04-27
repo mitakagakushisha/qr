@@ -4,30 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>在室確認・過去ログ</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      font-family: sans-serif;
-      background: #f0f2f5;
-      padding: 20px;
-    }
+    body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
 
     h2 { font-size: 20px; color: #333; margin-bottom: 16px; }
 
-    .tabs {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 0;
-    }
+    .tabs { display: flex; gap: 4px; margin-bottom: 0; flex-wrap: wrap; }
     .tab {
-      padding: 8px 20px;
-      border-radius: 6px 6px 0 0;
-      border: none;
-      background: #dde3ea;
-      color: #555;
-      font-size: 15px;
-      cursor: pointer;
+      padding: 8px 18px; border-radius: 6px 6px 0 0;
+      border: none; background: #dde3ea; color: #555;
+      font-size: 14px; cursor: pointer;
     }
     .tab.active { background: #4a90d9; color: #fff; font-weight: bold; }
 
@@ -35,121 +24,85 @@
     .panel.active { display: block; }
 
     .panel-body {
-      background: #fff;
-      border-radius: 0 8px 8px 8px;
+      background: #fff; border-radius: 0 8px 8px 8px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      padding: 16px;
-      margin-bottom: 16px;
+      padding: 16px; margin-bottom: 16px;
     }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
+    table { width: 100%; border-collapse: collapse; }
     thead { background: #4a90d9; color: #fff; }
-    th, td {
-      padding: 10px 12px;
-      text-align: left;
-      font-size: 14px;
-      border-bottom: 1px solid #eee;
-    }
+    th, td { padding: 10px 12px; text-align: left; font-size: 14px; border-bottom: 1px solid #eee; }
     tbody tr:last-child td { border-bottom: none; }
     tbody tr:hover { background: #f7f9fc; }
 
-    .badge {
-      display: inline-block;
-      padding: 2px 9px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: bold;
-    }
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 12px; font-weight: bold; }
     .badge-in   { background: #d4edda; color: #1a7a3f; }
     .badge-auto { background: #fff3cd; color: #856404; }
-    .long { color: #c0392b; font-weight: bold; }
+    .badge-manual { background: #e2d9f3; color: #5a3e85; }
 
-    .filter-bar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 14px;
-    }
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
     .filter-bar label { font-size: 13px; color: #555; }
-    .filter-bar input,
-    .filter-bar select {
-      padding: 6px 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 14px;
+    .filter-bar input, .filter-bar select {
+      padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;
     }
 
     button.btn {
-      padding: 7px 16px;
-      background: #4a90d9;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      cursor: pointer;
+      padding: 7px 16px; background: #4a90d9; color: #fff;
+      border: none; border-radius: 6px; font-size: 14px; cursor: pointer;
     }
     button.btn:active { background: #357abd; }
     button.btn-sm {
-      padding: 4px 10px;
-      font-size: 12px;
-      background: #e8a020;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+      padding: 4px 10px; font-size: 12px; background: #e8a020;
+      color: #fff; border: none; border-radius: 4px; cursor: pointer;
     }
-    button.btn-sm:active { background: #c07010; }
+    button.btn-danger {
+      padding: 4px 10px; font-size: 12px; background: #c0392b;
+      color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-left: 4px;
+    }
     button.btn-cancel {
-      padding: 4px 10px;
-      font-size: 12px;
-      background: #aaa;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      margin-left: 4px;
+      padding: 4px 10px; font-size: 12px; background: #aaa;
+      color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-left: 4px;
+    }
+    button.btn-add {
+      padding: 7px 16px; background: #27ae60; color: #fff;
+      border: none; border-radius: 6px; font-size: 14px; cursor: pointer; margin-bottom: 14px;
     }
 
     .meta { font-size: 12px; color: #888; margin-bottom: 10px; }
     .count { font-size: 14px; color: #555; margin-bottom: 12px; }
+    .error-msg { color: #c0392b; font-size: 14px; margin-bottom: 10px; display: none; }
+    .empty-msg { text-align: center; padding: 36px; color: #aaa; font-size: 15px; }
 
-    .error-msg {
-      color: #c0392b;
-      font-size: 14px;
-      margin-bottom: 10px;
-      display: none;
+    .fix-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; padding: 8px 12px; background: #f8f9fa; border-radius: 6px; }
+    .fix-form label { font-size: 13px; color: #555; }
+    .fix-form input[type="time"], .fix-form input[type="date"] {
+      padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;
     }
-
-    .empty-msg {
-      text-align: center;
-      padding: 36px;
-      color: #aaa;
-      font-size: 15px;
-    }
-
-    /* 修正フォーム（行内インライン） */
-    .fix-form {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 4px;
-    }
-    .fix-form input[type="time"] {
-      padding: 4px 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 13px;
-    }
-    .fix-msg {
-      font-size: 12px;
-      margin-left: 6px;
-    }
+    .fix-msg { font-size: 12px; margin-left: 6px; }
     .fix-msg.ok  { color: #1a7a3f; }
     .fix-msg.err { color: #c0392b; }
+
+    /* 追加フォーム */
+    .add-form {
+      background: #f0f7ff; border: 1px solid #b8d4f0; border-radius: 8px;
+      padding: 14px 16px; margin-bottom: 16px; display: none;
+    }
+    .add-form.show { display: block; }
+    .add-form h4 { font-size: 14px; color: #333; margin-bottom: 10px; }
+    .add-form .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
+    .add-form label { font-size: 13px; color: #555; }
+    .add-form input, .add-form select {
+      padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;
+    }
+
+    /* グラフエリア */
+    .chart-container { position: relative; width: 100%; max-height: 400px; }
+    .stats-filter { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+    .stats-filter label { font-size: 13px; color: #555; }
+    .stats-filter input, .stats-filter select {
+      padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;
+    }
+    .stats-table { margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -159,6 +112,7 @@
 <div class="tabs">
   <button class="tab active" onclick="switchTab('current')">在室中</button>
   <button class="tab"        onclick="switchTab('logs')">過去ログ</button>
+  <button class="tab"        onclick="switchTab('stats')">滞在時間集計</button>
 </div>
 
 <!-- 在室中 -->
@@ -178,32 +132,74 @@
     <div class="filter-bar">
       <label>開始日 <input type="date" id="from-date"></label>
       <label>終了日 <input type="date" id="to-date"></label>
-      <label>塾生
-        <select id="filter-name"><option value="">全員</option></select>
-      </label>
+      <label>塾生 <select id="filter-name"><option value="">全員</option></select></label>
       <button class="btn" onclick="loadLogs()">絞り込み</button>
     </div>
+    <button class="btn-add" onclick="toggleAddForm()">＋ 記録を追加</button>
+
+    <!-- 記録追加フォーム -->
+    <div class="add-form" id="add-form">
+      <h4>記録を手動追加</h4>
+      <div class="row">
+        <label>塾生 <select id="add-student"></select></label>
+        <label>日付 <input type="date" id="add-date"></label>
+      </div>
+      <div class="row">
+        <label>入室時刻 <input type="time" id="add-in"></label>
+        <label>退室時刻 <input type="time" id="add-out"> <span style="font-size:12px;color:#888;">（空欄可）</span></label>
+      </div>
+      <div class="row">
+        <button class="btn" onclick="submitAdd()">追加</button>
+        <button class="btn-cancel" onclick="toggleAddForm()">キャンセル</button>
+        <span class="fix-msg" id="add-msg"></span>
+      </div>
+    </div>
+
     <div class="error-msg" id="err-logs">データの取得に失敗しました。</div>
     <div class="meta" id="log-info"></div>
     <div id="logs-body"></div>
   </div>
 </div>
 
+<!-- 滞在時間集計 -->
+<div id="panel-stats" class="panel">
+  <div class="panel-body">
+    <div class="stats-filter">
+      <label>表示 
+        <select id="stats-mode" onchange="onStatsModeChange()">
+          <option value="monthly">月別ランキング</option>
+          <option value="student">塾生別推移</option>
+        </select>
+      </label>
+      <span id="stats-month-wrap">
+        <label>月を選択 <input type="month" id="stats-month"></label>
+      </span>
+      <span id="stats-student-wrap" style="display:none;">
+        <label>塾生 <select id="stats-student"></select></label>
+      </span>
+      <button class="btn" onclick="loadStats()">表示</button>
+    </div>
+    <div class="error-msg" id="err-stats">データの取得に失敗しました。</div>
+    <div class="chart-container"><canvas id="stats-chart"></canvas></div>
+    <div class="stats-table" id="stats-table"></div>
+  </div>
+</div>
+
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwjyfkI6m6RVizT1GRrJBNGOJ_WnZ7WFBBBWmxkTEVgGxta3Nr4Q5g0g0-ku3Ie7vic/exec";
+  let allSessions = [];
+  let statsChart  = null;
 
   // ======== タブ ========
   function switchTab(name) {
     document.querySelectorAll(".tab").forEach((t, i) => {
-      t.classList.toggle("active", ["current","logs"][i] === name);
+      t.classList.toggle("active", ["current","logs","stats"][i] === name);
     });
-    ["current","logs"].forEach(n => {
+    ["current","logs","stats"].forEach(n => {
       document.getElementById(`panel-${n}`).classList.toggle("active", n === name);
     });
-    if (name === "logs" && document.getElementById("logs-body").innerHTML === "") {
-      setDefaultDates();
-      loadLogs();
-    }
+    if (name === "logs"  && document.getElementById("logs-body").innerHTML === "") { setDefaultDates(); loadLogs(); }
+    if (name === "stats" && !statsChart) { setDefaultStats(); loadStats(); }
   }
 
   // ======== 在室中 ========
@@ -219,20 +215,12 @@
         body.innerHTML = '<div class="empty-msg">現在在室中の塾生はいません</div>';
       } else {
         document.getElementById("current-count").textContent = `在室中：${list.length}名`;
-        let html = `<table><thead><tr>
-          <th>氏名</th><th>塾生番号</th><th>入室時刻</th><th>滞在時間</th>
-        </tr></thead><tbody>`;
+        let html = `<table><thead><tr><th>氏名</th><th>塾生番号</th><th>入室時刻</th><th>滞在時間</th></tr></thead><tbody>`;
         for (const s of list) {
-          const h    = Math.floor(s.minutes / 60);
-          const m    = s.minutes % 60;
-          const stay = h > 0 ? `${h}時間${m}分` : `${m}分`;
-          const long = false;
-          html += `<tr>
-            <td>${s.name}</td>
-            <td>${s.studentId}</td>
+          const h = Math.floor(s.minutes / 60), m = s.minutes % 60;
+          html += `<tr><td>${s.name}</td><td>${s.studentId}</td>
             <td><span class="badge badge-in">IN</span> ${s.inTime}</td>
-            <td class="${long ? "long" : ""}">${stay}${long ? " ⚠" : ""}</td>
-          </tr>`;
+            <td>${h > 0 ? h+"時間" : ""}${m}分</td></tr>`;
         }
         html += "</tbody></table>";
         body.innerHTML = html;
@@ -241,19 +229,16 @@
       const now = new Date();
       document.getElementById("updated").textContent =
         `最終更新：${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`;
-    } catch {
-      document.getElementById("err-current").style.display = "block";
-    }
+    } catch { document.getElementById("err-current").style.display = "block"; }
   }
 
   // ======== 過去ログ ========
   function setDefaultDates() {
-    const t  = new Date();
-    const yy = t.getFullYear();
-    const mm = String(t.getMonth() + 1).padStart(2,"0");
-    const dd = String(t.getDate()).padStart(2,"0");
-    document.getElementById("from-date").value = `${yy}-${mm}-01`;
-    document.getElementById("to-date").value   = `${yy}-${mm}-${dd}`;
+    const t = new Date();
+    document.getElementById("from-date").value =
+      `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-01`;
+    document.getElementById("to-date").value =
+      `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
   }
 
   async function loadLogs() {
@@ -265,79 +250,93 @@
 
     try {
       const res      = await fetch(`${GAS_URL}?action=logs&from=${from}&to=${to}&t=${Date.now()}`);
-      const sessions = await res.json();
+      allSessions    = await res.json();
 
-      // 塾生プルダウン更新
-      const names = [...new Set(sessions.map(s => s.name))].sort();
-      const sel   = document.getElementById("filter-name");
-      const prev  = sel.value;
-      sel.innerHTML = '<option value="">全員</option>';
-      names.forEach(n => {
-        const opt = document.createElement("option");
-        opt.value = n; opt.textContent = n;
-        if (n === prev) opt.selected = true;
-        sel.appendChild(opt);
-      });
+      // 塾生プルダウン更新（ログ・追加フォーム共通）
+      const names = [...new Set(allSessions.map(s => s.name))].sort();
+      updateNameSelects(names, allSessions);
 
-      const filterName = sel.value;
-      const filtered   = filterName ? sessions.filter(s => s.name === filterName) : sessions;
-
-      document.getElementById("log-info").textContent =
-        `${from} 〜 ${to}　${filtered.length}件`;
-
-      if (filtered.length === 0) {
-        document.getElementById("logs-body").innerHTML =
-          '<div class="empty-msg">該当するログがありません</div>';
-        return;
-      }
-
-      let html = `<table><thead><tr>
-        <th>日付</th><th>氏名</th><th>入室</th><th>退室</th><th>滞在時間</th><th>修正</th>
-      </tr></thead><tbody>`;
-
-      for (const s of filtered) {
-        const h    = Math.floor(s.minutes / 60);
-        const m    = s.minutes % 60;
-        const stay = h > 0 ? `${h}時間${m}分` : `${m}分`;
-        const autoLabel = s.autoOut
-          ? `<span class="badge badge-auto">自動</span> ${s.outTime}`
-          : s.outTime;
-
-        html += `<tr id="row-${s.outRow}">
-          <td>${s.date}</td>
-          <td>${s.name}</td>
-          <td>${s.inTime}</td>
-          <td id="out-${s.outRow}">${autoLabel}</td>
-          <td id="stay-${s.outRow}">${stay}</td>
-          <td>
-            <button class="btn-sm" onclick="showFixForm(${s.outRow}, '${s.outTime}', '${s.inTime}')">修正</button>
-          </td>
-        </tr>
-        <tr id="fix-row-${s.outRow}" style="display:none;">
-          <td colspan="6">
-            <div class="fix-form">
-              <span style="font-size:13px;">退室時刻を修正：</span>
-              <input type="time" id="fix-time-${s.outRow}" value="${s.outTime}">
-              <button class="btn-sm" onclick="submitFix(${s.outRow}, '${s.inTime}')">保存</button>
-              <button class="btn-cancel" onclick="hideFixForm(${s.outRow})">キャンセル</button>
-              <span class="fix-msg" id="fix-msg-${s.outRow}"></span>
-            </div>
-          </td>
-        </tr>`;
-      }
-      html += "</tbody></table>";
-      document.getElementById("logs-body").innerHTML = html;
-
+      renderLogs();
     } catch {
       document.getElementById("err-logs").style.display = "block";
       document.getElementById("log-info").textContent = "";
     }
   }
 
-  // ======== 退室時刻修正 ========
-  function showFixForm(outRow, outTime, inTime) {
+  function updateNameSelects(names, sessions) {
+    const sel  = document.getElementById("filter-name");
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">全員</option>';
+    names.forEach(n => {
+      const o = document.createElement("option");
+      o.value = n; o.textContent = n;
+      if (n === prev) o.selected = true;
+      sel.appendChild(o);
+    });
+
+    // 追加フォームの塾生プルダウン（IDベース）
+    const addSel = document.getElementById("add-student");
+    const ids    = [...new Map(sessions.map(s => [s.studentId, s.name])).entries()];
+    addSel.innerHTML = "";
+    ids.forEach(([id, name]) => {
+      const o = document.createElement("option");
+      o.value = id; o.textContent = `${name}（${id}）`;
+      addSel.appendChild(o);
+    });
+  }
+
+  function renderLogs() {
+    const filterName = document.getElementById("filter-name").value;
+    const filtered   = filterName ? allSessions.filter(s => s.name === filterName) : allSessions;
+    const from = document.getElementById("from-date").value;
+    const to   = document.getElementById("to-date").value;
+
+    document.getElementById("log-info").textContent = `${from} 〜 ${to}　${filtered.length}件`;
+
+    if (filtered.length === 0) {
+      document.getElementById("logs-body").innerHTML = '<div class="empty-msg">該当するログがありません</div>';
+      return;
+    }
+
+    let html = `<table><thead><tr>
+      <th>日付</th><th>氏名</th><th>入室</th><th>退室</th><th>滞在時間</th><th>操作</th>
+    </tr></thead><tbody>`;
+
+    for (const s of filtered) {
+      const h = Math.floor(s.minutes / 60), m = s.minutes % 60;
+      const stay = `${h > 0 ? h+"時間" : ""}${m}分`;
+      const autoLabel   = s.autoOut   ? `<span class="badge badge-auto">自動</span> ` : "";
+      const manualLabel = s.autoOut === false && s.outRow ? "" : "";
+
+      html += `<tr id="row-${s.outRow}">
+        <td>${s.date}</td>
+        <td>${s.name}</td>
+        <td id="in-cell-${s.inRow}">${s.inTime}</td>
+        <td id="out-cell-${s.outRow}">${autoLabel}${s.outTime}</td>
+        <td id="stay-cell-${s.outRow}">${stay}</td>
+        <td>
+          <button class="btn-sm" onclick="showFixForm(${s.inRow},${s.outRow},'${s.inTime}','${s.outTime}','${s.date}')">修正</button>
+          <button class="btn-danger" onclick="confirmDelete(${s.inRow},${s.outRow})">削除</button>
+        </td>
+      </tr>
+      <tr id="fix-row-${s.outRow}" style="display:none;">
+        <td colspan="6">
+          <div class="fix-form">
+            <label>入室時刻 <input type="time" id="fix-in-${s.inRow}" value="${s.inTime}"></label>
+            <label>退室時刻 <input type="time" id="fix-out-${s.outRow}" value="${s.outTime}"></label>
+            <button class="btn-sm" onclick="submitFix(${s.inRow},${s.outRow},'${s.date}')">保存</button>
+            <button class="btn-cancel" onclick="hideFixForm(${s.outRow})">キャンセル</button>
+            <span class="fix-msg" id="fix-msg-${s.outRow}"></span>
+          </div>
+        </td>
+      </tr>`;
+    }
+    html += "</tbody></table>";
+    document.getElementById("logs-body").innerHTML = html;
+  }
+
+  function showFixForm(inRow, outRow, inTime, outTime, date) {
     document.getElementById(`fix-row-${outRow}`).style.display = "table-row";
-    document.getElementById(`fix-time-${outRow}`).value = outTime;
     document.getElementById(`fix-msg-${outRow}`).textContent = "";
   }
 
@@ -345,45 +344,200 @@
     document.getElementById(`fix-row-${outRow}`).style.display = "none";
   }
 
-  async function submitFix(outRow, inTime) {
-    const timeVal = document.getElementById(`fix-time-${outRow}`).value;
-    const msgEl   = document.getElementById(`fix-msg-${outRow}`);
+  async function submitFix(inRow, outRow, date) {
+    const inVal  = document.getElementById(`fix-in-${inRow}`).value;
+    const outVal = document.getElementById(`fix-out-${outRow}`).value;
+    const msgEl  = document.getElementById(`fix-msg-${outRow}`);
 
-    if (!timeVal) { msgEl.textContent = "時刻を入力してください"; msgEl.className = "fix-msg err"; return; }
-
-    // 入室時刻より前になっていないかチェック
-    if (timeVal <= inTime) {
-      msgEl.textContent = `入室時刻(${inTime})より後の時刻を入力してください`;
-      msgEl.className = "fix-msg err";
-      return;
-    }
+    if (!inVal || !outVal) { msgEl.textContent = "時刻を入力してください"; msgEl.className = "fix-msg err"; return; }
+    if (outVal <= inVal)   { msgEl.textContent = "退室は入室より後の時刻にしてください"; msgEl.className = "fix-msg err"; return; }
 
     msgEl.textContent = "保存中..."; msgEl.className = "fix-msg";
 
     try {
-      const res  = await fetch(`${GAS_URL}?action=fix&row=${outRow}&time=${timeVal}&t=${Date.now()}`);
-      const data = await res.json();
+      const [r1, r2] = await Promise.all([
+        fetch(`${GAS_URL}?action=fixIn&row=${inRow}&time=${inVal}&t=${Date.now()}`).then(r => r.json()),
+        fetch(`${GAS_URL}?action=fixOut&row=${outRow}&time=${outVal}&t=${Date.now()}`).then(r => r.json())
+      ]);
 
-      if (data.status === "ok") {
+      if (r1.status === "ok" && r2.status === "ok") {
         msgEl.textContent = "保存しました"; msgEl.className = "fix-msg ok";
-        // 表示を即時更新
-        document.getElementById(`out-${outRow}`).textContent = timeVal;
-        const inH = parseInt(inTime.split(":")[0]), inM = parseInt(inTime.split(":")[1]);
-        const otH = parseInt(timeVal.split(":")[0]),  otM = parseInt(timeVal.split(":")[1]);
-        const mins = (otH * 60 + otM) - (inH * 60 + inM);
+        document.getElementById(`in-cell-${inRow}`).textContent  = inVal;
+        document.getElementById(`out-cell-${outRow}`).textContent = outVal;
+        const [ih, im] = inVal.split(":").map(Number);
+        const [oh, om] = outVal.split(":").map(Number);
+        const mins = (oh * 60 + om) - (ih * 60 + im);
         const h = Math.floor(mins / 60), m = mins % 60;
-        document.getElementById(`stay-${outRow}`).textContent =
-          mins > 0 ? (h > 0 ? `${h}時間${m}分` : `${m}分`) : "-";
+        document.getElementById(`stay-cell-${outRow}`).textContent = `${h > 0 ? h+"時間" : ""}${m}分`;
         setTimeout(() => hideFixForm(outRow), 1500);
       } else {
         msgEl.textContent = "保存に失敗しました"; msgEl.className = "fix-msg err";
       }
-    } catch {
-      msgEl.textContent = "通信エラー"; msgEl.className = "fix-msg err";
+    } catch { msgEl.textContent = "通信エラー"; msgEl.className = "fix-msg err"; }
+  }
+
+  async function confirmDelete(inRow, outRow) {
+    if (!confirm("このセッションのIN・OUTレコードを両方削除しますか？")) return;
+    try {
+      // 行番号が大きい方から削除（小さい方を先に消すと行番号がずれるため）
+      const rows = [inRow, outRow].sort((a, b) => b - a);
+      for (const row of rows) {
+        await fetch(`${GAS_URL}?action=deleteRow&row=${row}&t=${Date.now()}`);
+      }
+      await loadLogs();
+    } catch { alert("削除に失敗しました。"); }
+  }
+
+  function toggleAddForm() {
+    const form = document.getElementById("add-form");
+    form.classList.toggle("show");
+    if (form.classList.contains("show")) {
+      const t = new Date();
+      document.getElementById("add-date").value =
+        `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
     }
   }
 
-  document.getElementById("filter-name").addEventListener("change", loadLogs);
+  async function submitAdd() {
+    const studentId = document.getElementById("add-student").value;
+    const date      = document.getElementById("add-date").value;
+    const inTime    = document.getElementById("add-in").value;
+    const outTime   = document.getElementById("add-out").value;
+    const msgEl     = document.getElementById("add-msg");
+
+    if (!studentId || !date || !inTime) { msgEl.textContent = "塾生・日付・入室時刻は必須です"; msgEl.className = "fix-msg err"; return; }
+    if (outTime && outTime <= inTime)   { msgEl.textContent = "退室は入室より後にしてください"; msgEl.className = "fix-msg err"; return; }
+
+    msgEl.textContent = "追加中..."; msgEl.className = "fix-msg";
+
+    try {
+      const inTs  = `${date}T${inTime}:00+09:00`;
+      const outTs = outTime ? `${date}T${outTime}:00+09:00` : "";
+      const res   = await fetch(`${GAS_URL}?action=addLog&studentId=${studentId}&inTime=${encodeURIComponent(inTs)}&outTime=${encodeURIComponent(outTs)}&t=${Date.now()}`);
+      const data  = await res.json();
+
+      if (data.status === "ok") {
+        msgEl.textContent = "追加しました"; msgEl.className = "fix-msg ok";
+        document.getElementById("add-in").value  = "";
+        document.getElementById("add-out").value = "";
+        setTimeout(() => { loadLogs(); toggleAddForm(); msgEl.textContent = ""; }, 1200);
+      } else {
+        msgEl.textContent = "追加に失敗しました"; msgEl.className = "fix-msg err";
+      }
+    } catch { msgEl.textContent = "通信エラー"; msgEl.className = "fix-msg err"; }
+  }
+
+  document.getElementById("filter-name").addEventListener("change", renderLogs);
+
+  // ======== 滞在時間集計 ========
+  function setDefaultStats() {
+    const t = new Date();
+    document.getElementById("stats-month").value =
+      `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}`;
+  }
+
+  function onStatsModeChange() {
+    const mode = document.getElementById("stats-mode").value;
+    document.getElementById("stats-month-wrap").style.display   = mode === "monthly" ? "" : "none";
+    document.getElementById("stats-student-wrap").style.display = mode === "student"  ? "" : "none";
+  }
+
+  async function loadStats() {
+    document.getElementById("err-stats").style.display = "none";
+    const mode = document.getElementById("stats-mode").value;
+
+    try {
+      if (mode === "monthly") {
+        const month = document.getElementById("stats-month").value;
+        const res   = await fetch(`${GAS_URL}?action=stats&month=${month}&t=${Date.now()}`);
+        const data  = await res.json();
+        renderMonthlyChart(data, month);
+      } else {
+        // 塾生プルダウンを生徒マスタから取得（過去ログから引用）
+        await ensureStatsStudentList();
+        const studentId = document.getElementById("stats-student").value;
+        if (!studentId) return;
+        const res  = await fetch(`${GAS_URL}?action=statsByStudent&studentId=${studentId}&t=${Date.now()}`);
+        const data = await res.json();
+        const name = document.getElementById("stats-student").selectedOptions[0]?.text || studentId;
+        renderStudentChart(data, name);
+      }
+    } catch { document.getElementById("err-stats").style.display = "block"; }
+  }
+
+  async function ensureStatsStudentList() {
+    const sel = document.getElementById("stats-student");
+    if (sel.options.length > 0) return;
+    // 過去ログの全期間から塾生一覧を取得
+    const res  = await fetch(`${GAS_URL}?action=logs&from=2000-01-01&to=2099-12-31&t=${Date.now()}`);
+    const data = await res.json();
+    const ids  = [...new Map(data.map(s => [s.studentId, s.name])).entries()];
+    ids.sort((a,b) => a[1].localeCompare(b[1], "ja"));
+    ids.forEach(([id, name]) => {
+      const o = document.createElement("option");
+      o.value = id; o.textContent = name;
+      sel.appendChild(o);
+    });
+  }
+
+  function renderMonthlyChart(data, month) {
+    const labels = data.map(d => d.name);
+    const values = data.map(d => Math.round(d.minutes / 60 * 10) / 10);
+
+    if (statsChart) statsChart.destroy();
+    const ctx = document.getElementById("stats-chart").getContext("2d");
+    statsChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{ label: "滞在時間（時間）", data: values, backgroundColor: "#4a90d9" }]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        plugins: { legend: { display: false }, title: { display: true, text: `${month} 月別ランキング` } },
+        scales: { x: { title: { display: true, text: "時間" } } }
+      }
+    });
+
+    // 表
+    let html = `<table><thead><tr><th>順位</th><th>氏名</th><th>合計滞在時間</th></tr></thead><tbody>`;
+    data.forEach((d, i) => {
+      const h = Math.floor(d.minutes / 60), m = d.minutes % 60;
+      html += `<tr><td>${i+1}位</td><td>${d.name}</td><td>${h}時間${m}分</td></tr>`;
+    });
+    html += "</tbody></table>";
+    document.getElementById("stats-table").innerHTML = html;
+  }
+
+  function renderStudentChart(data, name) {
+    const labels = data.map(d => d.month);
+    const values = data.map(d => Math.round(d.minutes / 60 * 10) / 10);
+
+    if (statsChart) statsChart.destroy();
+    const ctx = document.getElementById("stats-chart").getContext("2d");
+    statsChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{ label: "滞在時間（時間）", data: values, backgroundColor: "#27ae60" }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false }, title: { display: true, text: `${name} 月別推移（直近12ヶ月）` } },
+        scales: { y: { title: { display: true, text: "時間" }, beginAtZero: true } }
+      }
+    });
+
+    // 表
+    let html = `<table><thead><tr><th>月</th><th>合計滞在時間</th></tr></thead><tbody>`;
+    data.forEach(d => {
+      const h = Math.floor(d.minutes / 60), m = d.minutes % 60;
+      html += `<tr><td>${d.month}</td><td>${h}時間${m}分</td></tr>`;
+    });
+    html += "</tbody></table>";
+    document.getElementById("stats-table").innerHTML = html;
+  }
 
   // 初回
   loadCurrent();
